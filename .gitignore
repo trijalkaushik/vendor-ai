@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual env
+venv/
+.env/
+
+# Mac
+.DS_Store
+
+# Data files (IMPORTANT)
+data/raw/
+data/processed/
+
+# Optional (if large)
+*.xlsx
+
+# Logs
+*.log
