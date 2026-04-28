@@ -1,8 +1,8 @@
 import pandas as pd
 import os
 
-RAW_PATH = "/Users/trijalkaushik/vendor-ai/data/raw/salesdata.xlsx"
-OUTPUT_PATH = "/Users/trijalkaushik/vendor-ai/data/processed/cleaned.xlsx"
+RAW_PATH = "C:/Users/admin/vendor-ai/data/raw/salesdata2.xlsx"
+OUTPUT_PATH = "C:/Users/admin/vendor-ai/data/processed/cleaned.xlsx"
 
 
 def clean_excel():
@@ -15,7 +15,6 @@ def clean_excel():
 
     # Remove completely empty rows
     df = df.dropna(how="all")
-
     # Strip spaces from all values
     df = df.apply(lambda col: col.map(lambda x: str(x).strip() if pd.notna(x) else x))
 

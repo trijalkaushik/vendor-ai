@@ -15,17 +15,27 @@ def load_data():
     return df
 
 
+IMPORTANT_COLUMNS = [
+    "Name",
+    "Customer account",
+    "State Name",
+    "Item Name",
+    "Brand",
+    "MRP",
+    "Unit Price"
+]
+
 def build_text(row):
-    return f"""
-    Vendor: {row.get('Name','')}
-    City: {row.get('Source City','')}
-    State: {row.get('Source State','')}
-    GST: {row.get('Customer GST No.','')}
-    Account: {row.get('Customer account','')}
-    
-    Product: {row.get('Item Name','')}
-    Brand: {row.get('Brand','')}
-    Segment: {row.get('Product Segment','')}
-    
-    Category: Beverage distribution
-    """
+    parts = []
+
+    for col, val in row.items():
+        if val and str(val).strip() != "":
+            text = str(val)
+
+            if col in IMPORTANT_COLUMNS:
+                parts.append(text)
+                parts.append(text)  # boost weight
+            else:
+                parts.append(text)
+
+    return " ".join(parts)

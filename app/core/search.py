@@ -66,13 +66,13 @@ def weighted_score(row, query):
     base = fuzz.token_set_ratio(q, row["search_text"])
 
     bonus = 0
+
     for field in IMPORTANT_FIELDS:
         value = str(row.get(field, "")).lower()
         if value:
-            bonus += fuzz.partial_ratio(q, value) * 0.5
+            bonus += fuzz.partial_ratio(q, value) * 0.7
 
     return base + bonus
-
 
 # ---------------- UNIQUE VENDORS ----------------
 
