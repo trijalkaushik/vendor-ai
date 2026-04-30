@@ -1,89 +1,70 @@
 from app.core.loader import load_data
-from app.core.search import search
-from app.core.llm import generate_response
+from app.core.search import search, search_raw, extract_intent, generate_answer
 
-last_result = None
-
-# Load data once
+# ── Load data once ────────────────────────────────────────────────────────────
 df = load_data()
 
-
-def format_context(result, query):
-    def format_row(r):
-        q = query.lower()
-
-        parts = [
-            f"Name: {r['Name']}",
-            f"State: {r.get('State Name','')}",
-            f"Account: {r.get('Customer account','')}"
-        ]
-
-        if "item" in q or "product" in q:
-            parts.append(f"Item: {r.get('Item Name','')}")
-            parts.append(f"Brand: {r.get('Brand','')}")
-
-        if "price" in q or "mrp" in q:
-            parts.append(f"MRP: {r.get('MRP','')}")
-            parts.append(f"Unit Price: {r.get('Unit Price','')}")
-
-        if "sales" in q:
-            parts.append(f"Salesman: {r.get('Salesman','')}")
-            parts.append(f"ASM: {r.get('ASM','')}")
-            
-        if "GST" in q or "gst" in q:
-            parts.append(f"GST: {r.get('Customer GST No.','')}")
-            
-        if len(parts) < 4:
-            parts.append(f"Segment: {r.get('Product Segment','')}")
-
-        return " | ".join(parts)
-
-    if isinstance(result, list):
-        return "\n".join([format_row(r) for r in result])
-
-    return format_row(result)
-
-def is_simple_query(query):
-    q = query.lower()
-    return any(x in q for x in ["account", "vendor", "name"])
+FOLLOW_UP_TRIGGERS = ["same", "that", "their", "its", "those", "these", "them"]
 
 
-def chat(query):
-    global last_result
+# ── Session class ─────────────────────────────────────────────────────────────
+class VendorChatSession:
+    def __init__(self, dataframe):
+        self.df = dataframe
+        self.last_candidates = None
+        self.last_query = None
 
-    q = query.lower()
+    def _is_followup(self, query: str) -> bool:
+        words = query.lower().split()
+        return any(trigger in words for trigger in FOLLOW_UP_TRIGGERS)
 
-    # 👉 Handle follow-up queries
-    if any(x in q for x in ["same", "that", "their", "its"]):
-        if last_result is None:
-            return "No previous context available."
-        result = last_result
-    else:
-        result = search(df, query)
-        last_result = result  # store for next query
+    def chat(self, query: str) -> str:
+        query = query.strip()
+        if not query:
+            return ""
 
-    if result is None:
-        return "No relevant vendor found."
-
-    context = format_context(result, query)
-
-    if is_simple_query(query):
-        return context
-
-    return generate_response(context, query)
+        if self._is_followup(query) and self.last_candidates is not None:
+            # Reuse previous search results, just ask a new question about them
+            print(f"[chat] Follow-up detected, reusing {len(self.last_candidates)} previous results")
+            intent = extract_intent(query)
+            return generate_answer(query, self.last_candidates, intent)
+        else:
+            # Fresh query — run full pipeline
+            self.last_candidates = search_raw(self.df, query)
+            self.last_query = query
+            return search(self.df, query)
 
 
+# ── CLI entry point ───────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("Vendor AI ready. Type 'exit' to quit.")
+    # Check Ollama is running before starting
+    try:
+        import ollama
+        from app.core.search import MODEL
+        ollama.chat(
+            model=MODEL,
+            messages=[{"role": "user", "content": "hi"}],
+            options={"num_predict": 1, "temperature": 0},
+        )
+    except Exception as e:
+        print(f"[ERROR] Ollama not available or model not pulled: {e}")
+        print(f"Run: ollama pull {MODEL}")
+        exit(1)
+
+    session = VendorChatSession(df)
+    print("Vendor AI ready. Type 'exit' to quit.\n")
 
     while True:
-        q = input("\nAsk: ").strip()
+        try:
+            q = input("Ask: ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print("\nGoodbye.")
+            break
 
         if not q:
             continue
-
-        if q.lower() == "exit":
+        if q.lower() in ("exit", "quit"):
             break
 
-        response = chat(q)
-        print("\n", response)
+        response = session.chat(q)
+        print(f"\n{response}\n")
