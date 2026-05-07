@@ -54,7 +54,18 @@ SEARCHABLE_COLUMNS = [
     "PSR",
 ]
 
-DATA_PATH = os.environ.get("VENDOR_DATA_PATH", "data/processed/cleaned.xlsx")
+# Numeric columns to convert to float at load time
+# so the LLM never has to deal with string-typed numbers
+NUMERIC_COLS = [
+    "Line Amount",
+    "Total Amount",
+    "MRP",
+    "Unit Price",
+    "Base Quantity",
+    "IGST amount",
+    "CGST AMOUNT",
+    "SGST AMOUNT",
+]
 
 
 def load_data(path: str = DATA_PATH) -> pd.DataFrame:
@@ -102,10 +113,15 @@ def load_data(path: str = DATA_PATH) -> pd.DataFrame:
             df["Posting Date"], errors="coerce"
         ).dt.strftime("%Y-%m-%d").fillna("")
 
-    # Normalize numeric columns (remove stray commas/spaces)
-    for col in ["MRP", "Unit Price", "Base Quantity"]:
+    # ── Convert numeric columns to float ─────────────────────────────────────
+    # Do this AFTER stripping whitespace and commas.
+    # Columns are already actual floats — the LLM never needs pd.to_numeric().
+    for col in NUMERIC_COLS:
         if col in df.columns:
-            df[col] = df[col].str.replace(",", "").str.strip()
+            df[col] = pd.to_numeric(
+                df[col].str.replace(",", "").str.strip(),
+                errors="coerce"
+            )
 
     # Build a searchable text blob per row for fuzzy matching
     search_cols = [c for c in SEARCHABLE_COLUMNS if c in df.columns]
